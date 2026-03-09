@@ -65,18 +65,31 @@
       : "Tap: выстрел • Drag: движение";
   }
 
-  showWaveAnnouncement(wave) {
-    this.waveAnn.textContent = `🌊 Волна ${wave}`;
+  showWaveAnnouncement(text) {
+    this.waveAnn.textContent = text;
     this.waveAnn.style.opacity = "1";
     window.setTimeout(() => {
       this.waveAnn.style.opacity = "0";
     }, 1400);
   }
 
-  showOverlay({ title, sub, score = null, mainBtnText, showSaveForm = false, status = "" }) {
+  showOverlay({
+    title,
+    sub,
+    score = null,
+    mainBtnText,
+    menuBtnText = "В меню",
+    showMenuBtn = true,
+    showSaveForm = false,
+    saveBtnText = "Сохранить",
+    status = ""
+  }) {
     this.overlayTitle.textContent = title;
     this.overlaySub.textContent = sub;
     this.overlayMainBtn.textContent = mainBtnText;
+    this.overlayMenuBtn.textContent = menuBtnText;
+    this.overlayMenuBtn.classList.toggle("hidden", !showMenuBtn);
+    this.saveScoreBtn.textContent = saveBtnText;
     this.overlayStatus.textContent = status;
 
     if (score === null) {

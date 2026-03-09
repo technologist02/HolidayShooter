@@ -16,6 +16,8 @@ let input = null;
 let currentMode = GAME_MODES[0];
 let animationId = 0;
 let overlayContext = "start";
+let runStarted = false;
+let runScoreSaved = false;
 
 function isDesktopLike() {
   return window.matchMedia("(pointer:fine)").matches;
@@ -39,6 +41,11 @@ function renderFrame() {
   renderer.draw(snap);
 }
 
+function stopInputAndLoop() {
+  cancelAnimationFrame(animationId);
+  if (input) input.setEnabled(false);
+}
+
 function loop() {
   animationId = requestAnimationFrame(loop);
 
@@ -51,26 +58,35 @@ function loop() {
   updateHud();
   renderFrame();
 
+  if (result.bossSpawned) {
+    ui.showWaveAnnouncement(`👑 Босс: ${currentMode.boss.name}`);
+  }
+
   if (result.waveCompleted) {
-    ui.showWaveAnnouncement(engine.wave);
+    stopInputAndLoop();
+    ui.showWaveAnnouncement(`🌊 Волна ${engine.wave}`);
     ui.showOverlay({
       title: `Волна ${engine.wave}`,
       sub: `Атакуют ${engine.toSpawn} ${currentMode.enemyName}`,
-      mainBtnText: "Держать оборону"
+      mainBtnText: "Держать оборону",
+      menuBtnText: "В меню",
+      showSaveForm: false
     });
     overlayContext = "wave";
-    if (input) input.setEnabled(false);
+    return;
   }
 
   if (result.gameOver) {
+    stopInputAndLoop();
     overlayContext = "gameOver";
-    if (input) input.setEnabled(false);
     ui.showOverlay({
       title: "💥 Прорвались!",
       sub: "Сохрани результат в таблице лидеров",
       score: engine.score,
       mainBtnText: "Играть снова",
-      showSaveForm: true
+      menuBtnText: "В меню",
+      showSaveForm: true,
+      saveBtnText: runScoreSaved ? "Уже сохранено" : "Сохранить"
     });
   }
 }
@@ -99,6 +115,8 @@ function setupInput() {
 function startMode(modeId) {
   currentMode = getModeById(modeId);
   engine = new GameEngine(currentMode);
+  runStarted = false;
+  runScoreSaved = false;
   ui.setTheme(currentMode);
   ui.showGame();
   applySize();
@@ -109,11 +127,13 @@ function startMode(modeId) {
   ui.showOverlay({
     title: "Готов?",
     sub: `Волна 1: идут ${engine.toSpawn} ${currentMode.enemyName}`,
-    mainBtnText: "Атака"
+    mainBtnText: "Атака",
+    menuBtnText: "В меню"
   });
 }
 
 function startPlaying() {
+  runStarted = true;
   engine.start();
   ui.hideOverlay();
   if (input) input.setEnabled(true);
@@ -121,16 +141,27 @@ function startPlaying() {
 }
 
 function showMenu() {
-  cancelAnimationFrame(animationId);
-  if (input) input.setEnabled(false);
+  stopInputAndLoop();
   ui.showMenu();
 }
 
-async function saveScore() {
+function resolveResultWave(context) {
+  if (context === "waveExitSave" || context === "wave") {
+    return Math.max(1, engine.wave - 1);
+  }
+  return Math.max(1, engine.wave);
+}
+
+async function persistScore(context = overlayContext) {
+  if (runScoreSaved) {
+    ui.setSaveStatus("Этот результат уже сохранен");
+    return { ok: true, alreadySaved: true };
+  }
+
   const playerName = ui.getPlayerName();
   if (playerName.length < 2) {
     ui.setSaveStatus("Введите имя от 2 символов");
-    return;
+    return { ok: false };
   }
 
   ui.setSaveStatus("Сохраняем...");
@@ -140,27 +171,61 @@ async function saveScore() {
       playerName,
       modeId: currentMode.id,
       score: engine.score,
-      wave: engine.wave,
+      wave: resolveResultWave(context),
       endedAt: new Date().toISOString()
     });
 
     localStorage.setItem("holiday-shooter-player-name", playerName);
+    runScoreSaved = true;
     ui.setSaveStatus("Результат сохранен");
+    return { ok: true };
   } catch (error) {
     ui.setSaveStatus(`Ошибка: ${error.message}`);
+    return { ok: false };
   }
 }
 
+function showExitSaveOverlay() {
+  stopInputAndLoop();
+  overlayContext = "waveExitSave";
+  ui.showOverlay({
+    title: "🏁 Забег завершен",
+    sub: "Сохрани результат перед выходом в меню",
+    score: engine.score,
+    mainBtnText: "Сохранить и выйти",
+    menuBtnText: "Выйти без сохранения",
+    showSaveForm: true,
+    saveBtnText: runScoreSaved ? "Уже сохранено" : "Сохранить"
+  });
+}
+
 ui.renderModeCards(GAME_MODES, startMode);
-ui.onOverlayMain(() => {
+ui.onOverlayMain(async () => {
   if (overlayContext === "gameOver") {
     startMode(currentMode.id);
     return;
   }
+
+  if (overlayContext === "waveExitSave") {
+    const result = await persistScore("waveExitSave");
+    if (result.ok) showMenu();
+    return;
+  }
+
   startPlaying();
 });
-ui.onOverlayMenu(showMenu);
-ui.onSaveScore(saveScore);
+
+ui.onOverlayMenu(() => {
+  if (overlayContext === "wave" && runStarted) {
+    showExitSaveOverlay();
+    return;
+  }
+  showMenu();
+});
+
+ui.onSaveScore(async () => {
+  await persistScore(overlayContext);
+});
 
 ui.setPlayerName(localStorage.getItem("holiday-shooter-player-name") ?? "");
 window.addEventListener("resize", applySize);

@@ -36,7 +36,9 @@
     this.drawGround(snapshot);
     this.drawParticles(snapshot);
     this.drawProjectiles(snapshot);
+    this.drawEnemyProjectiles(snapshot);
     this.drawEnemies(snapshot);
+    this.drawBoss(snapshot);
     this.drawCannon(snapshot);
 
     ctx.restore();
@@ -119,6 +121,19 @@
     }
   }
 
+  drawEnemyProjectiles(snapshot) {
+    const ctx = this.ctx;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const p of snapshot.enemyProjectiles) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.font = `${p.size}px serif`;
+      ctx.fillText(p.emoji, 0, 0);
+      ctx.restore();
+    }
+  }
+
   drawEnemies(snapshot) {
     const ctx = this.ctx;
     ctx.textAlign = "center";
@@ -133,6 +148,45 @@
       ctx.shadowBlur = 0;
       ctx.restore();
     }
+  }
+
+  drawBoss(snapshot) {
+    if (!snapshot.boss) return;
+
+    const ctx = this.ctx;
+    const b = snapshot.boss;
+
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.shadowColor = snapshot.mode.theme.glow;
+    ctx.shadowBlur = 18;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `${b.size}px serif`;
+    ctx.fillText(b.emoji, 0, 0);
+    ctx.shadowBlur = 0;
+
+    if (snapshot.bossMood) {
+      ctx.font = `${Math.round(b.size * 0.38)}px serif`;
+      ctx.fillText(snapshot.bossMood, 0, -b.size * 0.8);
+    }
+
+    ctx.restore();
+
+    const barWidth = Math.min(240, this.width * 0.55);
+    const barX = b.x - barWidth / 2;
+    const barY = b.y - b.size * 0.78;
+    const ratio = Math.max(0, b.hp / b.maxHp);
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillRect(barX, barY, barWidth, 10);
+    ctx.fillStyle = snapshot.mode.boss.hpBarColor;
+    ctx.fillRect(barX, barY, barWidth * ratio, 10);
+    ctx.strokeStyle = "rgba(255,255,255,.35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barWidth, 10);
+    ctx.restore();
   }
 
   drawCannon(snapshot) {

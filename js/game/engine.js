@@ -14,6 +14,7 @@ export class GameEngine {
   constructor(mode) {
     this.mode = mode;
     this.state = "idle";
+    this.phase = "crowd";
     this.width = 390;
     this.height = 600;
     this.reset();
@@ -38,10 +39,13 @@ export class GameEngine {
     this.lives = this.mode.difficulty.baseLives;
     this.projectiles = [];
     this.enemies = [];
+    this.enemyProjectiles = [];
     this.particles = [];
     this.spawnTimer = 0;
     this.shakeAmt = 0;
     this.lastShot = { x: this.width / 2, y: this.height / 2 };
+    this.boss = null;
+    this.phase = "crowd";
     this.cannon = {
       x: this.width / 2,
       y: this.height - 56,
@@ -58,6 +62,9 @@ export class GameEngine {
     this.spawnInterval = waveInterval(this.wave);
     this.enemySpeed = waveSpeed(this.wave);
     this.spawnTimer = 0;
+    this.phase = "crowd";
+    this.boss = null;
+    this.enemyProjectiles = [];
   }
 
   start() {
@@ -126,10 +133,47 @@ export class GameEngine {
     });
   }
 
-  explode(x, y) {
-    for (let i = 0; i < 8; i += 1) {
-      const a = (i / 8) * Math.PI * 2;
-      const s = 3 + Math.random() * 5;
+  spawnBoss() {
+    const bossCfg = this.mode.boss;
+    const scale = this.width / 390;
+    const maxHp = bossCfg.baseHp + Math.floor((this.wave - 1) * bossCfg.hpPerWave);
+    this.boss = {
+      x: this.width / 2,
+      y: -58,
+      vx: Math.random() > 0.5 ? 1 : -1,
+      speed: bossCfg.baseSpeed + (this.wave - 1) * bossCfg.speedPerWave,
+      size: Math.round(78 * scale),
+      emoji: bossCfg.emoji,
+      hp: maxHp,
+      maxHp,
+      attackTimer: 70,
+      pauseFrames: 0,
+      behavior: bossCfg.behavior ?? "default",
+      rushTimer: 0,
+      wobble: Math.random() * Math.PI * 2
+    };
+    this.phase = "boss";
+  }
+
+  spawnEnemyProjectile(x, y, emoji, speed, tx = this.cannon.x, ty = this.cannon.y) {
+    const dx = tx - x;
+    const dy = ty - y;
+    const len = Math.hypot(dx, dy) || 1;
+    this.enemyProjectiles.push({
+      x,
+      y,
+      vx: (dx / len) * speed,
+      vy: (dy / len) * speed,
+      life: 160,
+      size: Math.round(26 * (this.width / 390)),
+      emoji
+    });
+  }
+
+  explode(x, y, count = 8, color = this.mode.theme.accent, emoji = this.mode.projectile) {
+    for (let i = 0; i < count; i += 1) {
+      const a = (i / count) * Math.PI * 2;
+      const s = 3 + Math.random() * 6;
       this.particles.push({
         x,
         y,
@@ -137,11 +181,104 @@ export class GameEngine {
         vy: Math.sin(a) * s,
         life: 32,
         maxLife: 32,
-        color: this.mode.theme.accent,
+        color,
         size: 10,
-        emoji: this.mode.projectile
+        emoji
       });
     }
+  }
+
+  applyBossHitReaction() {
+    if (!this.boss) return;
+    if (this.boss.behavior === "new-year") {
+      this.boss.y -= 8;
+    }
+    if (this.boss.behavior === "valentine") {
+      this.boss.rushTimer = 32;
+    }
+  }
+
+  updateBoss() {
+    if (!this.boss) return { gameOver: false };
+
+    const b = this.boss;
+    b.wobble += 0.05;
+
+    const rushMul = b.behavior === "valentine" && b.rushTimer > 0 ? 1.8 : 1;
+    if (b.rushTimer > 0) b.rushTimer -= 1;
+
+    if (b.pauseFrames > 0) {
+      b.pauseFrames -= 1;
+      if (b.pauseFrames === 0) {
+        this.spawnEnemyProjectile(
+          b.x,
+          b.y + b.size * 0.2,
+          this.mode.boss.counterAttack.emoji,
+          this.mode.boss.counterAttack.speed
+        );
+      }
+    } else {
+      b.x += b.vx * (1.25 + Math.sin(b.wobble) * 0.25);
+      b.y += b.speed * rushMul;
+    }
+
+    if (b.x < b.size * 0.5) {
+      b.x = b.size * 0.5;
+      b.vx *= -1;
+    }
+    if (b.x > this.width - b.size * 0.5) {
+      b.x = this.width - b.size * 0.5;
+      b.vx *= -1;
+    }
+
+    b.attackTimer -= 1;
+    if (b.attackTimer <= 0) {
+      if (b.behavior === "new-year") {
+        b.pauseFrames = 32;
+      } else {
+        this.spawnEnemyProjectile(
+          b.x,
+          b.y + b.size * 0.2,
+          this.mode.boss.counterAttack.emoji,
+          this.mode.boss.counterAttack.speed
+        );
+      }
+      b.attackTimer = Math.max(42, this.mode.boss.counterAttack.cooldownFrames - (this.wave - 1) * 2);
+    }
+
+    if (b.y > this.height + b.size * 0.35) {
+      this.lives = 0;
+      this.state = "dead";
+      return { gameOver: true };
+    }
+
+    return { gameOver: false };
+  }
+
+  updateEnemyProjectiles() {
+    for (let i = this.enemyProjectiles.length - 1; i >= 0; i -= 1) {
+      const p = this.enemyProjectiles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 1;
+
+      if (p.life <= 0 || p.y > this.height + 80 || p.x < -80 || p.x > this.width + 80) {
+        this.enemyProjectiles.splice(i, 1);
+        continue;
+      }
+
+      if (Math.hypot(p.x - this.cannon.x, p.y - this.cannon.y) < 26) {
+        this.enemyProjectiles.splice(i, 1);
+        this.lives -= 1;
+        this.shakeAmt = 8;
+        this.explode(this.cannon.x, this.cannon.y, 10, this.mode.theme.glow, this.mode.boss.counterAttack.emoji);
+        if (this.lives <= 0) {
+          this.state = "dead";
+          return { gameOver: true };
+        }
+      }
+    }
+    return { gameOver: false };
   }
 
   step() {
@@ -157,7 +294,7 @@ export class GameEngine {
     this.cannon.x += (this.cannon.targetX - this.cannon.x) * 0.18;
     this.cannon.angle = -Math.PI / 2 + ((this.cannon.targetX - this.width / 2) / (this.width / 2)) * 0.3;
 
-    if (this.spawned < this.toSpawn) {
+    if (this.phase === "crowd" && this.spawned < this.toSpawn) {
       this.spawnTimer += 1;
       if (this.spawnTimer >= this.spawnInterval) {
         this.spawnTimer = 0;
@@ -176,14 +313,38 @@ export class GameEngine {
         continue;
       }
 
+      let hit = false;
       for (let j = this.enemies.length - 1; j >= 0; j -= 1) {
         const e = this.enemies[j];
         if (Math.hypot(p.x - e.x, p.y - e.y) < e.size * 0.6) {
           this.explode(e.x, e.y);
           this.enemies.splice(j, 1);
-          this.projectiles.splice(i, 1);
           this.score += 10 * this.wave;
+          hit = true;
           break;
+        }
+      }
+
+      if (hit) {
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+
+      if (this.boss && Math.hypot(p.x - this.boss.x, p.y - this.boss.y) < this.boss.size * 0.56) {
+        this.projectiles.splice(i, 1);
+        this.boss.hp -= 1;
+        this.applyBossHitReaction();
+        this.flashParticles(this.boss.x, this.boss.y, 0, -1);
+
+        if (this.boss.hp <= 0) {
+          this.explode(this.boss.x, this.boss.y, 18, this.mode.theme.accent, this.mode.projectile);
+          this.score += this.wave * 50 + this.mode.boss.deathBonus * this.wave;
+          this.boss = null;
+          this.phase = "nextWave";
+          this.state = "idle";
+          this.wave += 1;
+          this.prepareWave();
+          return { changed: true, bossDefeated: true, waveCompleted: true };
         }
       }
     }
@@ -212,6 +373,21 @@ export class GameEngine {
       }
     }
 
+    if (this.phase === "crowd" && this.spawned >= this.toSpawn && this.enemies.length === 0 && !this.boss) {
+      this.spawnBoss();
+      return { changed: true, bossSpawned: true };
+    }
+
+    const bossResult = this.updateBoss();
+    if (bossResult.gameOver) {
+      return { changed: true, gameOver: true };
+    }
+
+    const enemyProjectileResult = this.updateEnemyProjectiles();
+    if (enemyProjectileResult.gameOver) {
+      return { changed: true, gameOver: true };
+    }
+
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
       p.x += p.vx;
@@ -224,27 +400,33 @@ export class GameEngine {
       }
     }
 
-    if (this.spawned >= this.toSpawn && this.enemies.length === 0) {
-      this.state = "idle";
-      this.score += this.wave * 50;
-      this.wave += 1;
-      this.prepareWave();
-      return { changed: true, waveCompleted: true };
-    }
-
     return { changed: true };
+  }
+
+  getBossMood() {
+    if (!this.boss || this.boss.behavior !== "valentine") return null;
+    const ratio = this.boss.hp / this.boss.maxHp;
+    if (ratio >= 0.8) return "🙂";
+    if (ratio >= 0.6) return "😕";
+    if (ratio >= 0.4) return "😞";
+    if (ratio >= 0.2) return "😢";
+    return "💀";
   }
 
   getSnapshot() {
     return {
       state: this.state,
+      phase: this.phase,
       score: this.score,
       lives: this.lives,
       wave: this.wave,
       shakeAmt: this.shakeAmt,
       cannon: this.cannon,
       projectiles: this.projectiles,
+      enemyProjectiles: this.enemyProjectiles,
       enemies: this.enemies,
+      boss: this.boss,
+      bossMood: this.getBossMood(),
       particles: this.particles,
       mode: this.mode,
       width: this.width,
