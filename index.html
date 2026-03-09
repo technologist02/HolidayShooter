@@ -1,0 +1,70 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Праздничный Обстрел</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="center-wrap">
+      <section id="menu">
+        <div class="title-wrap">
+          <h1>🎉 Праздничный<br />Обстрел</h1>
+          <p class="tagline">Выбери праздник и отражай волны врагов</p>
+        </div>
+
+        <div class="menu-actions">
+          <a class="menu-link" href="/stats">Статистика</a>
+        </div>
+
+        <div class="mode-cards" id="mode-cards"></div>
+      </section>
+
+      <section id="game-screen">
+        <div id="hud">
+          <div class="hud-stat"><span>🎯</span><span id="score-val">0</span></div>
+          <div class="hud-wave">🌊 Волна <span id="wave-num">1</span></div>
+          <div class="hud-stat right"><span id="lives-val">5</span><span>❤️</span></div>
+        </div>
+
+        <div id="canvas-wrap">
+          <canvas id="game-canvas"></canvas>
+          <div id="wave-ann"></div>
+          <div id="hint">Tap/Click: выстрел • Drag/Mouse/A,D/←,→: движение • Space: выстрел</div>
+
+          <div id="overlay" class="show">
+            <div class="overlay-card">
+              <h2 id="overlay-title">Готов?</h2>
+              <p class="overlay-sub" id="overlay-sub"></p>
+              <div id="overlay-score" class="hidden">0</div>
+
+              <div id="score-form" class="score-form">
+                <input id="player-name" class="score-input" type="text" maxlength="20" placeholder="Ваше имя" />
+                <button id="save-score-btn" class="ov-btn">Сохранить</button>
+              </div>
+              <div id="overlay-status" class="overlay-status"></div>
+
+              <div class="ov-actions">
+                <button id="overlay-main-btn" class="ov-btn">Начать</button>
+                <button id="overlay-menu-btn" class="ov-btn ghost">В меню</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    window.HS_API_BASE_URL = window.HS_API_BASE_URL || "https://api.yourdomain.com/api";
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

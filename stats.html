@@ -1,0 +1,42 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Статистика - Праздничный Обстрел</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="stats-body">
+  <main class="stats-page">
+    <div class="stats-wrap">
+      <header class="stats-header">
+        <h1>Статистика</h1>
+        <div class="top-controls">
+          <select id="mode-filter" class="stats-filter"></select>
+          <a href="/" class="stats-btn" style="text-decoration:none;display:inline-flex;align-items:center;">В игру</a>
+        </div>
+      </header>
+
+      <section class="stats-grid">
+        <article class="panel">
+          <h2>Топ-10</h2>
+          <div id="top-list" class="score-list"></div>
+        </article>
+
+        <article class="panel">
+          <h2>Последние игры</h2>
+          <div id="recent-list" class="score-list"></div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    window.HS_API_BASE_URL = window.HS_API_BASE_URL || "https://api.yourdomain.com/api";
+  </script>
+  <script type="module" src="./js/stats-main.js"></script>
+</body>
+</html>
