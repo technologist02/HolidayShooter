@@ -1,14 +1,19 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/stats", "destination": "/stats.html" },
-    { "source": "/(.*)", "destination": "/$1" }
+    {
+      "source": "/stats",
+      "destination": "/stats.html"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
     }
   ]
